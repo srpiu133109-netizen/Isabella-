@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nossa História — Jogo Incremental</title>
+<style>
+  :root {
+    --bg-a: #fff1f7;
+    --bg-b: #eaf7ff;
+    --surface: rgba(255,255,255,.84);
+    --surface-strong: #fff;
+    --text: #5d5266;
+    --muted: #91879a;
+    --accent: #ff86ad;
+    --accent-2: #9bdcff;
+    --gold: #ffc96b;
+    --success: #8fd6b5;
+    --danger: #f28da8;
+    --shadow: 0 18px 50px rgba(110, 86, 125, .14);
+    --radius: 24px;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: ui-rounded, "Trebuchet MS", system-ui, sans-serif;
+    color: var(--text);
+    background: linear-gradient(135deg, var(--bg-a), var(--bg-b));
+  }
+
+  .app {
+    min-height: 100vh;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .app::before, .app::after {
+    content: "";
+    position: fixed;
+    width: 320px;
+    height: 320px;
+    border-radius: 50%;
+    filter: blur(10px);
+    opacity: .35;
+    pointer-events: none;
+  }
+  .app::before { background: #ffd3e4; top: -120px; left: -100px; }
+  .app::after { background: #ccecff; bottom: -130px; right: -100px; }
+
+  .topbar {
+    max-width: 1180px;
+    margin: 0 auto 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    position: relative;
+    z-index: 2;
+  }
+  .brand h1 { margin: 0; font-size: clamp(1.5rem, 4vw, 2.3rem); }
+  .brand p { margin: 4px 0 0; color: var(--muted); font-size: .92rem; }
+  .wallet {
+    background: var(--surface);
+    border: 1px solid rgba(255,255,255,.75);
+    box-shadow: var(--shadow);
+    padding: 10px 16px;
+    border-radius: 999px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+  .heart { display:inline-block; animation: pulse 1.35s infinite; }
+  @keyframes pulse { 50% { transform: scale(1.18); } }
+
+  .layout {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(300px, .85fr);
+    gap: 16px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .panel {
+    background: var(--surface);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,.85);
+    box-shadow: var(--shadow);
+    border-radius: var(--radius);
+    padding: 18px;
+  }
+  .main { min-height: 680px; }
+  .side { display:flex; flex-direction:column; gap:16px; }
+
+  .phase {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .phase h2 { margin:0; font-size:1.15rem; }
+  .badge {
+    padding: 7px 11px;
+    border-radius: 999px;
+    background: #fff;
+    font-size: .82rem;
+    font-weight: 900;
+    box-shadow: 0 7px 20px rgba(100,80,110,.08);
+  }
+
+  .progress-wrap { margin-bottom: 18px; }
+  .progress-label { display:flex; justify-content:space-between; gap:10px; color:var(--muted); font-size:.84rem; margin-bottom:7px; }
+  .progress {
+    height: 13px;
+    background: rgba(255,255,255,.75);
+    border-radius: 999px;
+    overflow:hidden;
+    border:1px solid rgba(220,205,225,.55);
+  }
+  .progress > span {
+    display:block;
+    height:100%;
+    width:0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    border-radius:inherit;
+    transition:width .25s ease;
+  }
+
+  .playfield {
+    min-height: 430px;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    border-radius: 28px;
+    position: relative;
+    overflow: hidden;
+    display:grid;
+    place-items:center;
+    border: 2px solid rgba(255,255,255,.75);
+    background:
+      radial-gradient(circle at 20% 20%, rgba(255,255,255,.95) 0 8px, transparent 9px),
+      radial-gradient(circle at 78% 30%, rgba(255,255,255,.85) 0 6px, transparent 7px),
+      linear-gradient(145deg, #fbdde9, #dff3ff);
+  }
+  .cloud { position:absolute; width:110px; height:36px; background:rgba(255,255,255,.65); border-radius:999px; filter:blur(.2px); animation: drift 11s linear infinite; }
+  .cloud::before,.cloud::after { content:""; position:absolute; background:inherit; border-radius:50%; }
+  .cloud::before { width:44px; height:44px; left:18px; bottom:8px; }
+  .cloud::after { width:56px; height:56px; right:16px; bottom:6px; }
+  .c1 { top:17%; left:-130px; }
+  .c2 { top:65%; left:-180px; animation-delay:4s; transform:scale(.7); }
+  @keyframes drift { to { left:110%; } }
+
+  .falling-layer { position:absolute; inset:0; overflow:hidden; z-index:3; pointer-events:none; }
+  .player { position:absolute; bottom:24px; left:50%; width:92px; height:92px; transform:translateX(-50%); display:grid; place-items:center; border-radius:50%; background:rgba(255,255,255,.84); box-shadow:0 15px 35px rgba(90,70,100,.18), inset 0 0 0 7px rgba(255,255,255,.55); z-index:5; user-select:none; transition:left .08s linear; }
+  .player .animal { font-size:3.8rem; line-height:1; filter:drop-shadow(0 7px 5px rgba(70,50,80,.15)); transform:translateY(-2px); }
+  .player-shadow { position:absolute; width:55px; height:10px; bottom:5px; border-radius:50%; background:rgba(90,70,100,.12); filter:blur(4px); z-index:-1; }
+  .falling-heart { position:absolute; top:-55px; width:42px; height:42px; display:grid; place-items:center; font-size:1.9rem; filter:drop-shadow(0 5px 6px rgba(80,55,90,.15)); animation:fall linear forwards; will-change:transform,top; pointer-events:none; }
+  .falling-heart.good { animation-name:fall; }
+  @keyframes fall { from { transform:translateY(0) rotate(-12deg); } 50% { transform:translateY(210px) rotate(12deg); } to { transform:translateY(500px) rotate(-8deg); } }
+  .catch-pop { position:absolute; z-index:7; font-weight:1000; color:#ff6e9c; font-size:1.25rem; pointer-events:none; animation:pop .75s ease-out forwards; }
+  @keyframes pop { from { opacity:1; transform:translateY(0) scale(.8); } to { opacity:0; transform:translateY(-42px) scale(1.15); } }
+  .miss-pop { position:absolute; z-index:7; color:#8d8294; font-weight:900; animation:pop .7s ease-out forwards; }
+  .game-hint { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); width:max-content; max-width:92%; padding:7px 12px; border-radius:999px; background:rgba(255,255,255,.72); color:#786c80; font-size:.78rem; font-weight:900; z-index:6; text-align:center; }
+
+  .mobile-controls {
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:12px;
+    display:flex;
+    justify-content:space-between;
+    padding:0 14px;
+    z-index:10;
+    pointer-events:none;
+  }
+  .move-btn {
+    width:64px;
+    height:52px;
+    border:0;
+    border-radius:18px;
+    background:rgba(255,255,255,.82);
+    color:var(--text);
+    font-size:1.35rem;
+    font-weight:900;
+    box-shadow:0 8px 20px rgba(90,70,100,.14);
+    pointer-events:auto;
+    touch-action:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .move-btn:active { transform:scale(.94); }
+  @media (min-width: 700px) {
+    .mobile-controls { display:none; }
+  }
+
+  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:14px; }
+  .stat { background:rgba(255,255,255,.72); border-radius:18px; padding:12px; text-align:center; }
+  .stat b { display:block; font-size:1.15rem; }
+  .stat small { color:var(--muted); }
+
+  .tabs { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .tab-btn, button.action {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    border:0;
+    border-radius:16px;
+    padding:11px 10px;
+    cursor:pointer;
+    font:inherit;
+    font-weight:900;
+    color:var(--text);
+    background:#fff;
+    box-shadow:0 8px 20px rgba(90,70,100,.08);
+    transition:.18s ease;
+  }
+  .tab-btn.active, button.action.primary { background:linear-gradient(135deg,#ff9fbe,#a9def9); color:#fff; }
+  .tab-btn:hover, button.action:hover { transform:translateY(-2px); }
+  button:disabled { opacity:.45; cursor:not-allowed; transform:none !important; }
+
+  .tab-content { margin-top:12px; }
+  .section-title { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .section-title h3 { margin:0; font-size:1.05rem; }
+  .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:9px; max-height:405px; overflow:auto; padding-right:2px; }
+  .card {
+    background:rgba(255,255,255,.72);
+    border:1px solid rgba(230,218,235,.8);
+    border-radius:18px;
+    padding:12px;
+    display:flex;
+    flex-direction:column;
+    gap:7px;
+  }
+  .card-top { display:flex; align-items:center; gap:9px; }
+  .emoji { font-size:2rem; }
+  .card strong { font-size:.9rem; }
+  .card small { color:var(--muted); }
+  .owned { color:#62ae8b; font-weight:900; font-size:.78rem; }
+  .equipped { outline:2px solid var(--accent); }
+  .locked { opacity:.62; }
+  .story-card { grid-column:1/-1; }
+  .chapter { background:linear-gradient(135deg,rgba(255,225,238,.8),rgba(220,242,255,.8)); border-radius:18px; padding:15px; line-height:1.55; }
+  .chapter + .chapter { margin-top:9px; }
+  .chapter h4 { margin:0 0 6px; }
+  .empty { text-align:center; padding:28px 10px; color:var(--muted); }
+
+  .toast {
+    position:fixed;
+    left:50%;
+    bottom:22px;
+    transform:translate(-50%, 140%);
+    background:#5f5265;
+    color:#fff;
+    padding:12px 17px;
+    border-radius:999px;
+    box-shadow:var(--shadow);
+    z-index:20;
+    transition:transform .3s ease;
+    font-weight:800;
+  }
+  .toast.show { transform:translate(-50%,0); }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns:1fr; }
+    .main { min-height:auto; }
+    .side { display:block; }
+    .side > .panel { margin-top:16px; }
+  }
+  @media (max-width: 540px) {
+    .app { padding:12px; }
+    .topbar { align-items:flex-start; flex-direction:column; }
+    .wallet { align-self:stretch; text-align:center; }
+    .stats { grid-template-columns:1fr; }
+    .grid { grid-template-columns:1fr; }
+    .tabs { grid-template-columns:1fr 1fr 1fr; }
+    .tab-btn { font-size:.78rem; }
+    .playfield { min-height:380px; }
+  }
+</style>
+</head>
+<body>
+<noscript><div style="padding:20px;text-align:center;font-family:system-ui">Este jogo precisa do JavaScript ativado no navegador.</div></noscript>
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand">
+      <h1>🌷 Nossa História</h1>
+      <p>Pega os corações que caem e descobre a nossa história aos poucos. 💗</p>
+    </div>
+    <div class="wallet"><span class="heart">💗</span> <span id="hearts">0</span> Corações</div>
+  </header>
+
+  <main class="layout">
+    <section class="panel main">
+      <div class="phase">
+        <div>
+          <h2 id="phaseName">Fase 1 — Primeiro Encontro</h2>
+          <small id="phaseRequirement">0 / 100 Corações coletados</small>
+        </div>
+        <div class="badge" id="phaseBadge">FASE 1</div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-label"><span>Progresso da fase</span><span id="progressPercent">0%</span></div>
+        <div class="progress"><span id="progressBar"></span></div>
+      </div>
+
+      <div class="playfield" id="playfield" aria-label="Área para pegar os corações">
+        <div class="cloud c1"></div><div class="cloud c2"></div>
+        <div class="falling-layer" id="fallingLayer"></div>
+        <div class="player" id="player" role="img" aria-label="Personagem">
+          <span class="animal" id="animal">🐱</span>
+          <span class="player-shadow"></span>
+        </div>
+        <div class="game-hint">Arraste o dedo para mover o bichinho e pegar os 💗!</div>
+        <div class="mobile-controls" aria-label="Controles do jogo">
+          <button type="button" class="move-btn" id="moveLeft" aria-label="Mover para a esquerda">◀</button>
+          <button type="button" class="move-btn" id="moveRight" aria-label="Mover para a direita">▶</button>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><b id="totalCaught">0</b><small>Corações pegos</small></div>
+        <div class="stat"><b id="combo">x1</b><small>Combo</small></div>
+        <div class="stat"><b id="nextSkin">50 💗</b><small>Próxima skin</small></div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="panel">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="skins">🐾 Skins</button>
+          <button class="tab-btn" data-tab="themes">🌈 Temas</button>
+          <button class="tab-btn" data-tab="story">📖 História</button>
+        </div>
+        <div class="tab-content" id="tabContent"></div>
+      </section>
+    </aside>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const skins = [
+    { id:1,name:"Gatinho Fofo",emoji:"🐱",cost:50 },{ id:2,name:"Pandinha",emoji:"🐼",cost:100 },
+    { id:3,name:"Coelhinho",emoji:"🐰",cost:150 },{ id:4,name:"Ursinho",emoji:"🐻",cost:200 },
+    { id:5,name:"Raposinha",emoji:"🦊",cost:250 },{ id:6,name:"Pinguim",emoji:"🐧",cost:300 },
+    { id:7,name:"Porquinho",emoji:"🐷",cost:350 },{ id:8,name:"Cachorrinho",emoji:"🐶",cost:400 },
+    { id:9,name:"Ovelhinha",emoji:"🐑",cost:450 },{ id:10,name:"Tubãozinho Fofo",emoji:"🦈",cost:500 }
+  ];
+  const themes = [
+    {id:1,name:"Céu Pastel",emoji:"☁️",cost:75,colors:["#fff1f7","#eaf7ff"],accent:"#ff86ad",accent2:"#9bdcff"},
+    {id:2,name:"Floresta Mágica",emoji:"🌳",cost:175,colors:["#effbe8","#dff7ef"],accent:"#8fd6b5",accent2:"#b9e7ff"},
+    {id:3,name:"Fundo do Mar Fofo",emoji:"🌊",cost:300,colors:["#e1f7ff","#dceaff"],accent:"#67c7e8",accent2:"#b8a6ff"},
+    {id:4,name:"Jardim de Doces",emoji:"🍭",cost:450,colors:["#fff0dc","#ffe4f0"],accent:"#ff9a9e",accent2:"#c5a5ff"},
+    {id:5,name:"Noite Estrelada",emoji:"🌙",cost:650,colors:["#252747","#4b4774"],accent:"#bfa8ff",accent2:"#80d7ff",dark:true}
+  ];
+  const phaseNames=["Primeiro Encontro","Descobrindo Teus Detalhes","Nossas Risadas","Teu Coração","Pequenas Coisas","A Saudade","Tu Me Inspiras","O Teu Lugar em Mim","Nossos Sonhos","Para Sempre na Minha História"];
+  const chapters = [
+    [1,"O começo de nós","Talvez uma das coisas mais bonitas da nossa história seja saber que tudo começou de um jeito simples. Antes de eu entender o tamanho que tu terias na minha vida, existia apenas aquele primeiro momento, aquele olhar, aquela curiosidade e aquela sensação difícil de explicar. Hoje, olhando para trás, eu percebo que alguns dos acontecimentos mais importantes da nossa vida começam sem avisar que serão importantes. E foi assim contigo. Tu chegaste sem precisar anunciar nada e, pouco a pouco, foste ocupando espaços que antes nem existiam. Eu gosto de pensar que a nossa história não começou apenas quando passamos a nos conhecer melhor. Ela começou quando a vida colocou nossos caminhos no mesmo lugar e nos deu a oportunidade de descobrir o que existia por trás de um primeiro encontro. Se eu pudesse voltar naquele instante, eu não mudaria nada. Eu apenas olharia para ti com a certeza de que, sem saber, eu estava diante de alguém que se tornaria uma das pessoas mais importantes da minha vida."],
+    [2,"O teu jeito","Quanto mais eu te conheço, mais percebo que não existe uma única coisa capaz de explicar por que eu te amo tanto. É o conjunto. É teu jeito de falar, tuas expressões, tuas brincadeiras, tua maneira de reagir às coisas, tua personalidade, tua força e também tua sensibilidade. São aqueles detalhes que talvez outras pessoas nem percebam, mas que para mim passaram a ter um valor enorme. Eu amo quando tu és completamente tu mesma, sem tentar caber na expectativa de ninguém. Amo tua autenticidade, teu jeito particular de enxergar as situações e até aquelas pequenas manias que só aparecem quando estamos próximos. Tu tens uma identidade tão tua que seria impossível confundir-te com qualquer outra pessoa. E talvez seja justamente isso que mais me encanta: eu não me apaixonei por uma imagem perfeita. Eu me apaixonei por ti, pela pessoa real, com todos os detalhes que fazem teu jeito ser somente teu."],
+    [3,"Teu sorriso","Existe uma felicidade muito específica que aparece quando eu lembro do teu sorriso. Não é somente porque ele é bonito. É porque ele carrega momentos. Eu lembro de conversas, brincadeiras, situações inesperadas e daqueles instantes em que uma coisa simples virou motivo para nós dois rirmos. Eu amo a forma como teu sorriso muda o clima de um momento. Às vezes parece que ele consegue deixar tudo mais leve sem precisar de nenhuma explicação. E eu quero guardar isso: teu sorriso como uma das imagens mais bonitas da nossa história. Quero lembrar de como ele aparece quando tu estás feliz, das pequenas expressões que vêm junto e daquele jeito que faz uma conversa qualquer se transformar em uma memória. Se algum dia alguém me perguntar o que existe de tão especial em ti, eu poderia passar horas respondendo. Mas talvez uma das respostas mais simples fosse: porque teu sorriso consegue fazer um dia comum parecer um dia que valeu a pena viver."],
+    [4,"Teu coração","Depois de conhecer teu jeito, uma das coisas que mais passei a admirar foi teu coração. A pessoa que tu és quando ninguém está tentando te impressionar, quando não existe plateia e quando tu simplesmente ages de acordo com aquilo que sentes. Eu admiro teu cuidado, tua capacidade de te importar, tua sensibilidade e a maneira como tu consegues demonstrar carinho em pequenos gestos. Também admiro tua força. Tu tens uma delicadeza que não significa fraqueza. Pelo contrário. Existe muita coragem em continuar sendo uma pessoa sensível em um mundo que tantas vezes tenta endurecer as pessoas. Eu gosto desse equilíbrio em ti. Gosto da tua capacidade de amar, de defender quem é importante, de comemorar as conquistas das pessoas que tu gostas e de oferecer presença quando alguém precisa. Quanto mais eu conheço teu coração, mais percebo que é nele que mora uma das partes mais bonitas da pessoa que eu amo."],
+    [5,"Cada detalhe teu","Aprender alguém é uma forma de carinho. É começar a reconhecer pequenos sinais, lembrar de expressões, saber quais assuntos fazem teus olhos brilharem, perceber quando alguma coisa te deixa feliz e conhecer até aquelas manias que tu provavelmente nem percebes que tens. Eu amo esses detalhes. Amo tua voz, teu olhar, teu jeito de conversar, tuas expressões, tuas risadas, tuas brincadeiras e até aquelas pequenas imperfeições que tornam tudo verdadeiro. Eu não quero amar somente os momentos perfeitos. Quero gostar da realidade, da pessoa completa, dos dias bons e dos dias em que precisamos ter mais paciência, das conversas longas e das mensagens simples. Porque amar alguém de verdade também é aprender a reconhecer que a beleza está no conjunto. E quando penso no conjunto de tudo que és, eu só consigo sentir ainda mais admiração por ti."],
+    [6,"Quando bate a saudade","A saudade me ensinou uma coisa sobre nós: algumas pessoas deixam de ser apenas parte da rotina e passam a fazer parte da sensação de casa. Quando tu estás perto, muitas coisas parecem pequenas. Uma mensagem, uma ligação, uma conversa, uma risada ou simplesmente saber que tu estás ali. Mas quando existe distância, cada uma dessas coisas ganha um peso diferente. Eu sinto falta das nossas conversas, da tua companhia, do teu jeito, das tuas brincadeiras e até daqueles momentos em que não estávamos fazendo nada extraordinário. Porque contigo o simples nunca parece completamente simples. A saudade não é apenas sentir falta de uma pessoa. É sentir falta da versão de nós mesmos que aparece quando estamos perto de alguém que nos faz bem. E é por isso que, quando penso em ti, a vontade não é somente de lembrar. É de estar perto novamente e criar outra memória."],
+    [7,"Tu me fazes querer ser melhor","Uma das coisas que mais valorizo em ti é o quanto tua presença me inspira. Não porque eu precise ser perfeito para merecer teu carinho, mas porque quando alguém se torna importante, nasce naturalmente uma vontade de cuidar melhor, ouvir melhor, compreender melhor e crescer. Tu me fazes pensar no homem que quero ser, nas escolhas que quero fazer e no futuro que quero construir. Eu admiro tuas conquistas e também admiro as batalhas que ninguém vê. Tenho orgulho da tua caminhada, dos teus esforços e da pessoa que tu estás te tornando. Quero estar entre as pessoas que torcem por ti de verdade, que celebram teus avanços e que te lembram do quanto és capaz quando tu mesma esqueceres. Se amar alguém também é desejar que essa pessoa floresça, então eu quero continuar vendo tu floresceres, sem jamais tentar diminuir teu brilho."],
+    [8,"O espaço que tu ocupas","Existem pessoas que passam pela nossa vida e deixam lembranças. Existem outras que mudam a forma como a gente enxerga determinados dias. Tu te tornaste uma dessas pessoas para mim. Tu estás em pensamentos pequenos, em músicas, em lugares, em lembranças, em planos e em situações que às vezes nem têm relação direta contigo, mas acabam me fazendo pensar em ti. É curioso perceber como alguém consegue ocupar tanto espaço sem precisar estar presente o tempo inteiro. E eu gosto desse espaço. Gosto de saber que existem memórias que carregam teu nome, planos que me fazem pensar em nós e sonhos que ficam mais bonitos quando imagino tua presença neles. Tu não és apenas uma parte da minha história. Tu te tornaste uma parte importante da maneira como eu imagino os próximos capítulos dela."],
+    [9,"Teus sonhos também importam para mim","Eu quero conhecer os teus sonhos, acompanhar tuas conquistas e estar por perto quando novos objetivos aparecerem. Quero ouvir teus planos, comemorar tuas vitórias e lembrar-te de que tu não precisas diminuir aquilo que desejas para caber no mundo de ninguém. Eu admiro a pessoa que luta por aquilo que acredita. E quero que tu saibas que aquilo que é importante para ti também pode ser importante para mim. Não quero construir uma história em que apenas uma pessoa sonha. Quero uma história em que os dois possam crescer, conquistar, aprender e olhar para trás com orgulho de tudo que viveram. Se algum dia teus sonhos mudarem, eu quero conhecer os novos sonhos. Se algum dia tu tiveres medo, quero lembrar-te da tua força. E se algum dia tu conquistares algo enorme, quero ser uma das pessoas mais felizes por ti."],
+    [10,"O que eu amo em ti","Eu amo muito mais do que aquilo que consigo colocar em uma lista. Amo teu sorriso, teu olhar, tua voz, teu jeito, tua personalidade, tuas brincadeiras, tua força, tua sensibilidade, tua maneira de cuidar, tua forma de demonstrar carinho e todos aqueles detalhes que só aparecem quando alguém passa tempo suficiente contigo. Amo as pequenas coisas que fazem eu reconhecer que és tu mesmo antes de qualquer palavra. Amo a maneira como uma conversa contigo pode mudar meu humor. Amo as lembranças que construímos e a possibilidade de ainda construir tantas outras. E talvez a parte mais bonita seja que, quanto mais eu tento explicar por que te amo, mais percebo que o sentimento não cabe em uma explicação. Eu encontro uma nova razão em cada detalhe e, quando acho que já descobri todas, aparece mais uma."],
+    [11,"Nós nos momentos simples","Nem sempre serão grandes acontecimentos que vão definir a nossa história. Talvez sejam justamente as coisas pequenas que um dia vamos lembrar com mais carinho. Uma conversa tarde, uma brincadeira que só nós entendemos, um passeio simples, uma mensagem inesperada, uma risada em um momento qualquer. Eu quero aprender a valorizar esses instantes porque eles são a matéria-prima das melhores lembranças. A vida não é feita somente de dias extraordinários. Ela é feita de muitos dias comuns que se tornam extraordinários por causa de quem está ao nosso lado. E contigo eu aprendi que uma companhia pode transformar completamente a experiência de viver um momento. Não precisamos de um cenário perfeito para ter uma memória bonita. Às vezes basta nós dois, uma conversa e tempo suficiente para o mundo parecer um pouco mais leve."],
+    [12,"Quando penso no futuro","Quando imagino o futuro, não penso somente em grandes acontecimentos. Penso em uma sequência de pequenos momentos que ainda não existem. Penso em conversas que ainda teremos, lugares que ainda conheceremos, conquistas que ainda celebraremos e dificuldades que talvez precisemos enfrentar juntos. Gosto da ideia de construir algo com calma, respeitando quem somos e permitindo que cada etapa tenha seu próprio significado. O futuro não precisa ser perfeito para ser bonito. Ele precisa ser verdadeiro. E se existe algo que eu desejo para os próximos capítulos da minha vida, é continuar encontrando espaço para ti neles. Quero que nossos sonhos possam crescer sem pressa e que, quando olharmos para trás, possamos reconhecer quantas coisas bonitas nasceram de momentos que pareciam pequenos no começo."],
+    [13,"A pessoa que eu escolheria conhecer de novo","Se eu tivesse a oportunidade de voltar ao começo e viver tudo novamente, eu gostaria de descobrir-te outra vez. Gostaria de viver novamente a curiosidade dos primeiros momentos, as primeiras conversas, as primeiras risadas e todas aquelas pequenas descobertas que fazem duas pessoas se aproximarem. Mas existe uma diferença: agora eu saberia o tamanho da história que estava começando. Talvez eu prestasse ainda mais atenção. Guardaria ainda mais detalhes. Aproveitaria cada instante com aquela consciência de que algumas pessoas aparecem uma vez e mudam tudo. E, mesmo conhecendo todos os capítulos que vieram depois, eu ainda escolheria ler o primeiro. Porque ele guarda a surpresa mais bonita de todas: descobrir que uma pessoa que parecia ser apenas mais alguém poderia se tornar alguém tão importante."],
+    [14,"Se eu pudesse te dizer tudo","Se eu pudesse colocar em palavras tudo aquilo que sinto, provavelmente precisaria de muito mais espaço do que existe aqui. Eu falaria sobre cada lembrança, cada conversa, cada sorriso, cada momento em que tua presença fez diferença. Falaria sobre o quanto admiro quem tu és e sobre como existem detalhes teus que talvez tu consideres comuns, mas que para mim são especiais. Diria que não quero que tu duvides do teu valor por causa de um dia ruim, de uma dificuldade ou da opinião de alguém. Tu és muito maior do que qualquer momento difícil. E eu também diria que meu carinho por ti não depende de um único dia perfeito. Ele existe nos detalhes, na constância, na vontade de cuidar e na escolha de continuar conhecendo-te. Algumas coisas podem ser explicadas. O que sinto por ti, porém, é uma daquelas coisas que a gente consegue explicar um pouco e sentir muito mais."],
+    [15,"A nossa história continua","E talvez esta seja a parte mais bonita: esta história não termina aqui. Cada coração que tu pegas neste jogo representa um pequeno pedaço de tudo aquilo que ainda pode ser vivido. Ainda existem conversas que não tivemos, lugares que não conhecemos, risadas que ainda não aconteceram, planos que ainda vão mudar e memórias que ainda nem possuem nome. Eu quero que nossa história continue sendo construída por detalhes reais, por cuidado, respeito, carinho, paciência, alegria e por aquela vontade bonita de escolher um ao outro todos os dias. Se cada capítulo anterior falou de uma parte de ti que eu amo, este fala de uma coisa maior: eu amo a pessoa que tu és hoje e tenho curiosidade, carinho e esperança por todas as versões de ti que ainda vou conhecer. Então guarda esta última parte como uma promessa de narrativa, não de perfeição: enquanto houver novos dias, haverá novos capítulos. E, se depender de mim, cada um deles vai continuar tendo um pedacinho de nós." ]
+  ].map(([n,title,text])=>({n,key:`heart-${n}`,title:`Capítulo ${n} — ${title}`,text}));
+
+  const defaultState=()=>({hearts:0,totalCaught:0,phase:1,ownedSkins:[],ownedThemes:[],equippedSkin:1,equippedTheme:1,unlockedChapters:[],activeTab:"skins",combo:1});
+  let state=load();
+  let keys={left:false,right:false};
+  let playerX=.5;
+  let spawnTimer=0;
+  let lastTime=performance.now();
+  let running=true;
+  let catchTimes=[];
+
+  function load(){
+    try{
+      const saved=JSON.parse(localStorage.getItem("nossa-historia-save"));
+      if(!saved) return defaultState();
+      const b=defaultState(), m={...b,...saved};
+      m.hearts=Math.max(0,Number(m.hearts)||0); m.totalCaught=Math.max(0,Number(m.totalCaught)||0);
+      m.phase=Math.min(10,Math.max(1,Number(m.phase)||1));
+      m.ownedSkins=Array.isArray(m.ownedSkins)?m.ownedSkins.filter(id=>skins.some(x=>x.id===id)):[];
+      m.ownedThemes=Array.isArray(m.ownedThemes)?m.ownedThemes.filter(id=>themes.some(x=>x.id===id)):[];
+      m.unlockedChapters=Array.isArray(m.unlockedChapters)?m.unlockedChapters.filter(k=>chapters.some(c=>c.key===k)):[];
+      if(!skins.some(x=>x.id===m.equippedSkin)||!m.ownedSkins.includes(m.equippedSkin))m.equippedSkin=1;
+      if(!themes.some(x=>x.id===m.equippedTheme)||!m.ownedThemes.includes(m.equippedTheme))m.equippedTheme=1;
+      return m;
+    }catch{return defaultState()}
+  }
+  function save(){
+    try { localStorage.setItem("nossa-historia-save",JSON.stringify(state)); }
+    catch(e) { /* Alguns navegadores bloqueiam armazenamento local; o jogo continua funcionando. */ }
+  }
+  function phaseTarget(p){return Math.floor(100*Math.pow(2.35,p-1));}
+  function phaseStart(p){return p===1?0:phaseTarget(p-1);}
+  function format(n){return Math.floor(n).toLocaleString("pt-BR");}
+  function chapterThreshold(i){return Math.floor(25*Math.pow(1.55,i));}
+  function unlockUpTo(total){
+    chapters.forEach((c,i)=>{if(total>=chapterThreshold(i) && !state.unlockedChapters.includes(c.key)) state.unlockedChapters.push(c.key)});
+  }
+  function checkProgress(){
+    while(state.phase<10 && state.totalCaught>=phaseTarget(state.phase)){state.phase++; toast(`✨ Fase ${state.phase} liberada!`);}
+    const before=state.unlockedChapters.length;
+    unlockUpTo(state.totalCaught);
+    if(state.unlockedChapters.length>before){
+      const newest=chapters[state.unlockedChapters.length-1];
+      toast(`📖 Novo capítulo: ${newest.title.replace(/^Capítulo \d+ — /,"")}`);
+    }
+  }
+  function buySkin(id){const x=skins.find(s=>s.id===id);if(!x||state.ownedSkins.includes(id))return;if(state.hearts<x.cost)return toast(`Faltam ${format(x.cost-state.hearts)} 💗.`);state.hearts-=x.cost;state.ownedSkins.push(id);state.equippedSkin=id;toast(`${x.name} comprado! 💗`);save();render();}
+  function buyTheme(id){const x=themes.find(t=>t.id===id);if(!x||state.ownedThemes.includes(id))return;if(state.hearts<x.cost)return toast(`Faltam ${format(x.cost-state.hearts)} 💗.`);state.hearts-=x.cost;state.ownedThemes.push(id);state.equippedTheme=id;toast(`${x.name} desbloqueado! 🌈`);save();render();}
+  function equipSkin(id){if(state.ownedSkins.includes(id)){state.equippedSkin=id;save();render();}}
+  function equipTheme(id){if(state.ownedThemes.includes(id)){state.equippedTheme=id;save();render();}}
+  function addCaught(x,y){
+    state.hearts++; state.totalCaught++;
+    const now=performance.now(); catchTimes=catchTimes.filter(t=>now-t<1500); catchTimes.push(now); state.combo=Math.min(8,Math.max(1,catchTimes.length));
+    checkProgress(); save(); renderCore();
+    const pop=document.createElement("div");pop.className="catch-pop";pop.textContent=`+${state.combo>1?state.combo:"1"} 💗`;pop.style.left=`${x}px`;pop.style.top=`${y}px`;document.getElementById("playfield").appendChild(pop);setTimeout(()=>pop.remove(),750);
+  }
+  function spawnHeart(){
+    const field=document.getElementById("playfield"), layer=document.getElementById("fallingLayer");
+    const h=document.createElement("div"); h.className="falling-heart"; h.textContent=["💗","💕","💖"][Math.floor(Math.random()*3)];
+    const w=field.clientWidth; const x=18+Math.random()*(w-54); h.style.left=x+"px";
+    const duration=Math.max(2.1,3.4-(state.phase-1)*.09+Math.random()*.8); h.style.animationDuration=duration+"s"; layer.appendChild(h);
+    const start=performance.now();
+    const hit=setInterval(()=>{
+      if(!h.isConnected){clearInterval(hit);return;}
+      const hr=h.getBoundingClientRect(), pr=document.getElementById("player").getBoundingClientRect();
+      const overlap=hr.left<hr.right && hr.right>pr.left && hr.bottom>pr.top && hr.top<pr.bottom;
+      if(overlap){
+        clearInterval(hit); addCaught(pr.left-field.getBoundingClientRect().left+38,pr.top-field.getBoundingClientRect().top); h.remove();
+      } else if(performance.now()-start>duration*1000+250){clearInterval(hit);h.remove();}
+    },45);
+  }
+  function updatePlayer(dt){
+    const field=document.getElementById("playfield"), player=document.getElementById("player"); if(!field||!player)return;
+    const speed=.72; if(keys.left)playerX-=speed*dt;if(keys.right)playerX+=speed*dt;playerX=Math.max(.07,Math.min(.93,playerX));player.style.left=(playerX*100)+"%";
+  }
+  function loop(now){if(!running)return;const dt=Math.min(.05,(now-lastTime)/1000);lastTime=now;updatePlayer(dt);spawnTimer-=dt;const interval=Math.max(.28,.72-(state.phase-1)*.035);if(spawnTimer<=0){spawnHeart();spawnTimer=interval;}requestAnimationFrame(loop);}
+  function applyTheme(){const t=themes.find(x=>x.id===state.equippedTheme)||themes[0];document.documentElement.style.setProperty("--bg-a",t.colors[0]);document.documentElement.style.setProperty("--bg-b",t.colors[1]);document.documentElement.style.setProperty("--accent",t.accent);document.documentElement.style.setProperty("--accent-2",t.accent2);document.documentElement.style.setProperty("--text",t.dark?"#f4efff":"#5d5266");document.documentElement.style.setProperty("--muted",t.dark?"#c9c0d8":"#91879a");document.body.style.background=`linear-gradient(135deg,${t.colors[0]},${t.colors[1]})`;}
+  function renderCore(){
+    const skin=skins.find(x=>x.id===state.equippedSkin)||skins[0],target=phaseTarget(state.phase),start=phaseStart(state.phase),current=Math.max(0,state.totalCaught-start),max=Math.max(1,target-start),pct=Math.min(100,current/max*100),next=skins.find(x=>!state.ownedSkins.includes(x.id));
+    document.getElementById("hearts").textContent=format(state.hearts);document.getElementById("totalCaught").textContent=format(state.totalCaught);document.getElementById("combo").textContent=`x${state.combo||1}`;document.getElementById("animal").textContent=skin.emoji;document.getElementById("phaseName").textContent=`Fase ${state.phase} — ${phaseNames[state.phase-1]}`;document.getElementById("phaseBadge").textContent=`FASE ${state.phase}`;document.getElementById("phaseRequirement").textContent=state.phase===10?`${format(state.totalCaught)} / ${format(target)} Corações coletados`:`${format(Math.min(state.totalCaught,target))} / ${format(target)} Corações coletados`;document.getElementById("progressPercent").textContent=`${Math.floor(pct)}%`;document.getElementById("progressBar").style.width=pct+"%";document.getElementById("nextSkin").textContent=next?`${format(next.cost)} 💗`:"Todas! ✨";
+  }
+  function skinsHTML(){return `<div class="section-title"><h3>🐾 Loja de bichinhos</h3><small>${state.ownedSkins.length}/10</small></div><div class="grid">${skins.map(s=>{const owned=state.ownedSkins.includes(s.id),eq=state.ownedSkins.includes(s.id)&&state.equippedSkin===s.id,can=state.hearts>=s.cost;return `<article class="card ${eq?"equipped":""} ${!owned&&!can?"locked":""}"><div class="card-top"><span class="emoji">${s.emoji}</span><div><strong>${s.name}</strong><br><small>${format(s.cost)} 💗</small></div></div>${owned?`<span class="owned">${eq?"✓ Equipado":"✓ Comprado"}</span><button class="action" data-equip-skin="${s.id}">${eq?"Usando":"Usar"}</button>`:`<button class="action ${can?"primary":""}" data-buy-skin="${s.id}" ${can?"":"disabled"}>Comprar</button>`}</article>`}).join("")}</div>`;}
+  function themesHTML(){return `<div class="section-title"><h3>🌈 Temas de fundo</h3><small>${state.ownedThemes.length}/${themes.length}</small></div><div class="grid">${themes.map(t=>{const own=state.ownedThemes.includes(t.id),eq=state.ownedThemes.includes(t.id)&&state.equippedTheme===t.id,can=state.hearts>=t.cost;return `<article class="card ${eq?"equipped":""} ${!own&&!can?"locked":""}"><div class="card-top"><span class="emoji">${t.emoji}</span><div><strong>${t.name}</strong><br><small>${format(t.cost)} 💗</small></div></div>${own?`<span class="owned">${eq?"✓ Selecionado":"✓ Desbloqueado"}</span><button class="action" data-equip-theme="${t.id}">${eq?"Selecionado":"Selecionar"}</button>`:`<button class="action ${can?"primary":""}" data-buy-theme="${t.id}" ${can?"":"disabled"}>Comprar</button>`}</article>`}).join("")}</div>`;}
+  function storyHTML(){const unlocked=chapters.filter(c=>state.unlockedChapters.includes(c.key));const next=chapters.find(c=>!state.unlockedChapters.includes(c.key));if(!unlocked.length)return `<div class="empty">🔒<br><br><strong>Nossa História ainda está esperando por ti.</strong><br>Pega ${format(chapterThreshold(0))} corações para abrir o primeiro capítulo.</div>`;return `<div class="section-title"><h3>📖 Nossa História</h3><small>${unlocked.length}/${chapters.length}</small></div><div class="chapter-list">${unlocked.map(c=>`<article class="chapter"><h4>${c.title}</h4><div>${c.text}</div></article>`).join("")}${next?`<div class="empty">🔐 Próximo capítulo em ${format(Math.max(0,chapterThreshold(next.n-1)-state.totalCaught))} corações.</div>`:`<div class="chapter final-note"><h4>💗 Todos os capítulos foram encontrados</h4><div>Tu chegou até o fim desta parte da história. Mas, dentro do jogo, a história continua enquanto novos corações forem coletados.</div></div>`}</div>`;}
+  function bind(){document.querySelectorAll("[data-buy-skin]").forEach(b=>b.onclick=()=>buySkin(+b.dataset.buySkin));document.querySelectorAll("[data-equip-skin]").forEach(b=>b.onclick=()=>equipSkin(+b.dataset.equipSkin));document.querySelectorAll("[data-buy-theme]").forEach(b=>b.onclick=()=>buyTheme(+b.dataset.buyTheme));document.querySelectorAll("[data-equip-theme]").forEach(b=>b.onclick=()=>equipTheme(+b.dataset.equipTheme));}
+  function renderTab(){document.querySelectorAll(".tab-btn").forEach(b=>b.classList.toggle("active",b.dataset.tab===state.activeTab));const root=document.getElementById("tabContent");root.innerHTML=state.activeTab==="skins"?skinsHTML():state.activeTab==="themes"?themesHTML():storyHTML();bind();}
+  function render(){applyTheme();renderCore();renderTab();}
+  function toast(msg){const e=document.getElementById("toast");e.textContent=msg;e.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("show"),2100);}
+
+  document.querySelectorAll(".tab-btn").forEach(b=>b.onclick=()=>{state.activeTab=b.dataset.tab;save();renderTab();});
+  document.addEventListener("keydown",e=>{if(["ArrowLeft","a","A"].includes(e.key)){keys.left=true;e.preventDefault();}if(["ArrowRight","d","D"].includes(e.key)){keys.right=true;e.preventDefault();}});
+  document.addEventListener("keyup",e=>{if(["ArrowLeft","a","A"].includes(e.key))keys.left=false;if(["ArrowRight","d","D"].includes(e.key))keys.right=false;});
+  const field=document.getElementById("playfield");
+  let touchX=null;
+  field.addEventListener("touchstart",e=>{
+    if(!e.touches.length)return;
+    touchX=e.touches[0].clientX;
+    e.preventDefault();
+  },{passive:false});
+  field.addEventListener("touchmove",e=>{
+    if(touchX===null || !e.touches.length)return;
+    const x=e.touches[0].clientX;
+    const delta=x-touchX;
+    if(Math.abs(delta)>2){
+      playerX += delta / Math.max(1,field.clientWidth);
+      playerX=Math.max(.07,Math.min(.93,playerX));
+      document.getElementById("player").style.left=(playerX*100)+"%";
+    }
+    touchX=x;
+    e.preventDefault();
+  },{passive:false});
+  field.addEventListener("touchend",e=>{keys.left=keys.right=false;touchX=null;e.preventDefault();},{passive:false});
+  field.addEventListener("touchcancel",()=>{keys.left=keys.right=false;touchX=null;},{passive:true});
+
+  function holdButton(el, direction){
+    if(!el)return;
+    const down=e=>{e.preventDefault();keys[direction]=true;};
+    const up=e=>{e.preventDefault();keys[direction]=false;};
+    el.addEventListener("pointerdown",down);
+    ["pointerup","pointercancel","pointerleave"].forEach(ev=>el.addEventListener(ev,up));
+  }
+  holdButton(document.getElementById("moveLeft"),"left");
+  holdButton(document.getElementById("moveRight"),"right");
+
+  render();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
